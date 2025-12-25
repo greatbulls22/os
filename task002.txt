@@ -1192,6 +1192,8 @@ void* print_even(void* arg) {
     return NULL;
 }
 
+
+mutex counter 
 int main() {
     pthread_t t1, t2;
     
@@ -1211,3 +1213,31 @@ int main() {
 
     return 0;
 }
+
+#include <stdio.h>
+#include <pthread.h>
+pthread_mutex_t serial_mtx;
+void * run(void *arg)
+{
+(void)arg;
+static int serial = 0;
+// <-- MUTEX VARIABLE
+// Shared static variable!
+// Acquire the mutex--all threads will block on this call
+until
+// they get the lock:
+pthread_mutex_lock(&serial_mtx);
+// <-- ACQUIRE MUTEX
+printf("Thread running! %d\n", serial);
+serial++;
+// Done getting and setting the data, so free the lock. This
+//will unblock threads on the mutex_lock() call:
+pthread_mutex_unlock(&serial_mtx);
+// <-- RELEASE MUTEX
+return 0;
+}
+#define THREAD_COUNT 10
+int main(void)
+{
+pthread_t t[THREAD_COUNT];
+// Initialize the mutex variable, indicating this is a normal
