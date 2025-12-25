@@ -1,0 +1,530 @@
+Lab 03: OpenMP Constructs & Work-Sharing
+
+
+int thread_ID = omp_get_thread_num()
+int num_threads = omp_get_num_threads();
+    omp_set_num_threads(num_threads);
+
+3. Array Summation Without Work-Sharing (The "Problem" Example)  Note: This code runs on every thread, causing duplicated work.
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <omp.h>
+
+int main(int argc, char const *argv[]) {
+    int A[10] = {1,2,3,4,5,6,7,8,9,10};
+    int B[10] = {1,2,3,4,5,6,7,8,9,10};
+    int C[10];
+
+    #pragma omp parallel
+    {
+        int thread_ID = omp_get_thread_num();
+        int num_threads = omp_get_num_threads();
+        printf("Thread %d of %d is executing \n", thread_ID, num_threads);
+
+        for (int i = 0; i < 10; i++) {
+            C[i] = A[i] + B[i];
+        }
+        
+        printf("The new values are:");
+        for (int j = 0; j < 10; j++) {
+            printf("%d ", C[j]);
+        }
+        printf("\n");
+    }
+    return 0;
+}
+
+1.sequential time:
+
+We use the clock() function from <time.h> to measure CPU time of sequential execution:
+
+clock_t begin = clock();
+for (int i=0; i<sz; i++) {
+C[i] = A[i] * B[i];
+}
+clock_t end = clock();
+double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
+printf("Sequential Time: %f seconds\n", time_spent);
+
+
+2.parallel time:
+
+We use omp_get_wtime() which gives wall-clock time (real elapsed time).
+
+double s_time = omp_get_wtime();
+#pragma omp parallel
+{
+for (int i=0; i<sz; i++) {
+C[i] = A[i] * B[i];
+}
+}
+double time_omp = omp_get_wtime() - s_time;
+printf("Parallel without data distribution Time: %f seconds\n", time_omp);
+
+Part 2: Lab 03 Task Solutions
+
+Task 1: Hello World with Threads & Timing  Prints Hello World with different thread counts and measures execution time.
+
+#include <stdio.h>
+#include <omp.h>
+#include <time.h>
+
+void run_hello(int num_threads) {
+    clock_t start = clock();
+    
+    // Set number of threads specifically for this run
+    omp_set_num_threads(num_threads);
+
+    #pragma omp parallel
+    {
+        int id = omp_get_thread_num();
+        int total = omp_get_num_threads();
+        printf("Hello from thread %d of %d\n", id, total);
+    }
+
+    clock_t end = clock();
+    double time_spent = (double)(end - start) / CLOCKS_PER_SEC;
+    printf("Execution time with %d threads: %f seconds\n\n", num_threads, time_spent);
+}
+
+int main() {
+    run_hello(2);
+    run_hello(4);
+    run_hello(8);
+    return 0;
+}
+
+Task 2: Array Summation WITHOUT Work-Sharing  Demonstrates the problem where every thread duplicates the work.
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <omp.h>
+#include <time.h>
+
+#define SIZE 1000
+
+int main() {
+    int A[SIZE], B[SIZE], C[SIZE];
+
+    // Initialize
+    for(int i=0; i<SIZE; i++) { A[i] = 1; B[i] = 1; }
+
+    clock_t start = clock();
+
+    #pragma omp parallel
+    {
+        // Without 'omp for', every thread runs this whole loop!
+        for(int i=0; i<SIZE; i++) {
+            C[i] = A[i] + B[i]; 
+        }
+        
+        // Print just once to show it happened (optional visualization)
+        #pragma omp single
+        printf("Work completed (Duplicated by all threads)\n");
+    }
+
+    clock_t end = clock();
+    printf("Time without work-sharing: %f seconds\n", (double)(end - start)/CLOCKS_PER_SEC);
+    
+    return 0;
+}
+
+Task 3: Array Summation WITH Work-Sharing  Corrects Task 2 using omp for and measures wall-clock time.
+
+#include <stdio.h>
+#include <omp.h>
+#include <time.h>
+
+#define SIZE 100000
+
+int main() {
+    int A[SIZE], B[SIZE], C[SIZE];
+    for(int i=0; i<SIZE; i++) { A[i] = i; B[i] = i; }
+
+    // Sequential timing
+    clock_t start_seq = clock();
+    for(int i=0; i<SIZE; i++) C[i] = A[i] + B[i];
+    clock_t end_seq = clock();
+    printf("Sequential Time: %f s\n", (double)(end_seq - start_seq)/CLOCKS_PER_SEC);
+
+    // Parallel timing
+    double start_par = omp_get_wtime();
+    
+    #pragma omp parallel num_threads(4)
+    {
+        #pragma omp for
+        for(int i=0; i<SIZE; i++) {
+            C[i] = A[i] + B[i];
+            // Uncomment next line to see thread distribution (slows down large loops)
+            // printf("Thread %d computed index %d\n", omp_get_thread_num(), i);
+        }
+    }
+    
+    double end_par = omp_get_wtime();
+    printf("Parallel Time (4 threads): %f s\n", end_par - start_par);
+
+    return 0;
+}
+
+Task 4: Reduction (Sum 1 to 1,000,000) 
+
+#include <stdio.h>
+#include <omp.h>
+#include <time.h>
+
+#define N 1000000
+
+int main() {
+    // 1. Sequential Version
+    long long sum_seq = 0;
+    clock_t start = clock();
+    for(int i=1; i<=N; i++) {
+        sum_seq += i;
+    }
+    clock_t end = clock();
+    printf("Sequential Sum: %lld, Time: %f s\n", sum_seq, (double)(end-start)/CLOCKS_PER_SEC);
+
+    // 2. Parallel Version with Reduction
+    long long sum_par = 0;
+    double start_par = omp_get_wtime();
+    
+    #pragma omp parallel for reduction(+:sum_par)
+    for(int i=1; i<=N; i++) {
+        sum_par += i;
+    }
+    
+    double end_par = omp_get_wtime();
+    printf("Parallel Sum:   %lld, Time: %f s\n", sum_par, end_par - start_par);
+
+    return 0;
+}
+
+Task 5: Sections Construct (Independent Tasks)  Performs Sum, Product, and Max on different threads.
+
+#include <stdio.h>
+#include <omp.h>
+
+int main() {
+    int A[5] = {1, 2, 3, 4, 5};
+    int B[5] = {1, 2, 3, 4, 5};
+    int C[5] = {10, 50, 20, 90, 30};
+    
+    int sum = 0, product = 1, max_val = 0;
+
+    double start = omp_get_wtime();
+
+    #pragma omp parallel sections
+    {
+        #pragma omp section
+        {
+            for(int i=0; i<5; i++) sum += A[i];
+            printf("Section 1 (Sum) by Thread %d: %d\n", omp_get_thread_num(), sum);
+        }
+
+        #pragma omp section
+        {
+            for(int i=0; i<5; i++) product *= B[i];
+            printf("Section 2 (Product) by Thread %d: %d\n", omp_get_thread_num(), product);
+        }
+
+        #pragma omp section
+        {
+            max_val = C[0];
+            for(int i=1; i<5; i++) if(C[i] > max_val) max_val = C[i];
+            printf("Section 3 (Max) by Thread %d: %d\n", omp_get_thread_num(), max_val);
+        }
+    }
+
+    double end = omp_get_wtime();
+    printf("Total Execution Time: %f s\n", end - start);
+
+    return 0;
+}
+
+Lab 04: Critical Section & Advanced Reduction
+
+1. Getting Total & Thread ID (#pragma omp parallel)
+
+#include <stdio.h>
+#include <omp.h>
+
+int main() {
+    #pragma omp parallel
+    {
+        int id = omp_get_thread_num(); // Thread ID
+        int total = omp_get_num_threads(); // Total threads
+        printf("Hello from thread %d of %d\n", id, total);
+    }
+    return 0;
+}
+
+2. Loop Construct (#pragma omp for) with Arrays
+
+#include <stdio.h>
+#include <omp.h>
+
+int main() {
+    int A[10], B[10], C[10];
+    
+    // Sequential Init
+    for (int i = 0; i < 10; i++) {
+        A[i] = i;
+        B[i] = i * 2;
+    }
+
+    #pragma omp parallel
+    {
+        #pragma omp for
+        for (int i = 0; i < 10; i++) {
+            C[i] = A[i] + B[i];
+            printf("Thread %d computed C[%d] = %d\n", omp_get_thread_num(), i, C[i]);
+        }
+    }
+    return 0;
+}
+
+3. Sections Construct (#pragma omp sections) 
+
+#include <stdio.h>
+#include <omp.h>
+
+int main() {
+    #pragma omp parallel
+    {
+        #pragma omp sections
+        {
+            #pragma omp section
+            printf("Thread %d handles task A\n", omp_get_thread_num());
+            
+            #pragma omp section
+            printf("Thread %d handles task B\n", omp_get_thread_num());
+            
+            #pragma omp section
+            printf("Thread %d handles task C\n", omp_get_thread_num());
+        }
+    }
+    return 0;
+}
+
+4. for reduction(+=sum) Example (Sum Array) 
+
+#include <stdio.h>
+#include <omp.h>
+
+int main() {
+    int A[100];
+    int n = 100;
+    int sum = 0;
+    
+    // Init array
+    for(int i=0; i<n; i++) A[i] = 1;
+
+    #pragma omp parallel for reduction(+:sum)
+    for(int i=0; i<n; i++) {
+        sum += A[i];
+    }
+    
+    printf("Sum: %d\n", sum);
+    return 0;
+}
+
+5. Critical Section Snippet  .(#pragma omp critical)
+
+#include <omp.h>
+#include <stdio.h>
+
+int main() {
+    int sharedVar = 0;
+    
+    #pragma omp parallel
+    {
+        #pragma omp critical
+        {
+            sharedVar += 1;
+        }
+    }
+    printf("Shared Var: %d\n", sharedVar);
+    return 0;
+}
+
+Part 2: Lab 04 Task Solutions
+
+Task 1: Hello World with Critical  Ensures output lines do not overlap.
+
+#include <stdio.h>
+#include <omp.h>
+
+int main() {
+    omp_set_num_threads(4); // Requirement: at least 4 threads
+
+    #pragma omp parallel
+    {
+        int id = omp_get_thread_num();
+        int total = omp_get_num_threads();
+
+        // Critical section ensures only one thread prints at a time
+        #pragma omp critical
+        {
+            printf("Hello from thread %d of %d\n", id, total);
+        }
+    }
+    return 0;
+}
+
+Task 2: Vector sum for reduction(+=sum)  Compares Sequential vs Parallel Reduction.
+
+#include <stdio.h>
+#include <omp.h>
+#include <time.h>
+
+#define N 100000
+
+int main() {
+    int A[N];
+    for(int i=0; i<N; i++) A[i] = 1; // Fill array
+
+    // 1. Sequential
+    int sum_seq = 0;
+    clock_t start = clock();
+    for(int i=0; i<N; i++) sum_seq += A[i];
+    clock_t end = clock();
+    printf("Sequential Sum: %d, Time: %f s\n", sum_seq, (double)(end-start)/CLOCKS_PER_SEC);
+
+    // 2. Parallel with Reduction
+    int sum_par = 0;
+    double start_par = omp_get_wtime();
+    
+    #pragma omp parallel for reduction(+:sum_par)
+    for(int i=0; i<N; i++) {
+        sum_par += A[i];
+    }
+    
+    double end_par = omp_get_wtime();
+    printf("Parallel Sum:   %d, Time: %f s\n", sum_par, end_par - start_par);
+
+    return 0;
+}
+
+Task 3: Min & Max (Reduction vs Critical)  Implements finding Min/Max using both methods.
+
+#include <stdio.h>
+#include <omp.h>
+#include <limits.h>
+
+#define SZ 20
+
+int main() {
+    int arr[SZ];
+    // Initialize with some random-ish values
+    for(int i=0; i<SZ; i++) arr[i] = (i * 37) % 100; 
+
+    // Version A: Reduction
+    int minVal = INT_MAX, maxVal = INT_MIN;
+    double startA = omp_get_wtime();
+    
+    #pragma omp parallel for reduction(min:minVal) reduction(max:maxVal)
+    for(int i=0; i<SZ; i++) {
+        if(arr[i] < minVal) minVal = arr[i];
+        if(arr[i] > maxVal) maxVal = arr[i];
+    }
+    double endA = omp_get_wtime();
+    printf("Reduction -> Min: %d, Max: %d, Time: %f\n", minVal, maxVal, endA - startA);
+
+    // Version B: Critical
+    minVal = INT_MAX; maxVal = INT_MIN;
+    double startB = omp_get_wtime();
+
+    #pragma omp parallel for
+    for(int i=0; i<SZ; i++) {
+        #pragma omp critical
+        {
+            if(arr[i] < minVal) minVal = arr[i];
+            if(arr[i] > maxVal) maxVal = arr[i];
+        }
+    }
+    double endB = omp_get_wtime();
+    printf("Critical  -> Min: %d, Max: %d, Time: %f\n", minVal, maxVal, endB - startB);
+
+    return 0;
+}
+
+Task 4: Shared Variable Update (Race Condition vs Critical)  Demonstrates data corruption without critical section.
+
+#include <stdio.h>
+#include <omp.h>
+
+int main() {
+    int counter;
+    int target = 8;
+    omp_set_num_threads(target);
+
+    // Case 1: Without Critical (Race Condition)
+    counter = 0;
+    #pragma omp parallel
+    {
+        // Many threads read/write same time -> Lost updates
+        counter = counter + 1; 
+    }
+    printf("Counter WITHOUT Critical (Expected %d): %d\n", target, counter);
+
+    // Case 2: With Critical (Correct)
+    counter = 0;
+    #pragma omp parallel
+    {
+        #pragma omp critical
+        {
+            counter = counter + 1;
+        }
+    }
+    printf("Counter WITH Critical    (Expected %d): %d\n", target, counter);
+
+    return 0;
+}
+
+Task 5: Matrix Multiplication with Parallel Reduction  Parallelizes Matrix Mul using omp parallel for and inner reduction.
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <omp.h>
+
+#define N 200 // Size of Matrix
+
+int main() {
+    int A[N][N], B[N][N], C[N][N];
+    
+    // Initialize
+    for(int i=0; i<N; i++) {
+        for(int j=0; j<N; j++) {
+            A[i][j] = 1; 
+            B[i][j] = 1;
+            C[i][j] = 0;
+        }
+    }
+
+    double start = omp_get_wtime();
+
+    // Parallel Matrix Multiplication
+    // We parallelize the outer loop (rows of C)
+    #pragma omp parallel for
+    for (int i = 0; i < N; i++) {
+        for (int j = 0; j < N; j++) {
+            int sum = 0;
+            // Reduction isn't strictly necessary here if sum is private, 
+            // but manual asks to use reduction accumulation inside.
+            // Typically for dot product:
+            for (int k = 0; k < N; k++) {
+                sum += A[i][k] * B[k][j];
+            }
+            C[i][j] = sum;
+        }
+    }
+
+    double end = omp_get_wtime();
+    printf("Parallel Matrix Mul Time (N=%d): %f s\n", N, end - start);
+    
+    // Verify one element
+    printf("C[0][0] = %d (Should be %d)\n", C[0][0], N);
+
+    return 0;
+}

@@ -1,0 +1,484 @@
+Lab 05: OpenMP - Data Environment and Synchronization
+
+1. Private Variable Example (#pragma omp private)  Demonstrates that private variables are unique to each thread.
+
+#include <stdio.h>
+#include <omp.h>
+
+int main() {
+    int x = 5;
+    #pragma omp parallel private(x)
+    {
+        x = omp_get_thread_num(); // Each thread sets its own x
+        printf("Thread %d: x = %d\n", omp_get_thread_num(), x);
+    }
+    printf("After parallel region: x = %d\n", x);
+    return 0;
+}
+
+2. Shared Variable Without Synchronization (Race Condition)  Demonstrates incorrect results when multiple threads update a shared variable simultaneously.
+
+#include <stdio.h>
+#include <omp.h>
+
+int main() {
+    int total = 0;
+    #pragma omp parallel shared(total)
+    {
+        total += 1; // multiple threads update same variable
+    }
+    printf("Total = %d\n", total);
+    return 0;
+}
+
+3. Shared Variable With Atomic (Correct)  Fixes the previous example using atomic.
+
+#include <stdio.h>
+#include <omp.h>
+
+int main() {
+    int total = 0;
+    #pragma omp parallel shared(total)
+    {
+        #pragma omp atomic
+        total += 1;
+    }
+    printf("Total = %d\n", total);
+    return 0;
+}
+
+4. Barrier Example (#pragma omp barrier)  Forces all threads to wait until everyone reaches the barrier.
+
+#include <stdio.h>
+#include <omp.h>
+
+int main() {
+    #pragma omp parallel num_threads(4)
+    {
+        int id = omp_get_thread_num();
+        printf("Thread %d: Before barrier\n", id);
+        #pragma omp barrier // all threads wait here
+        printf("Thread %d: After barrier\n", id);
+    }
+    return 0;
+}
+
+5. Atomic Counter Example  Efficiently updates a counter using atomic.
+
+#include <stdio.h>
+#include <omp.h>
+
+int main() {
+    int count = 0;
+    #pragma omp parallel num_threads(16)
+    {
+        #pragma omp atomic
+        count += 1;
+    }
+    printf("Final count = %d\n", count);
+}
+
+6. Master Directive Example (#pragma omp master)  Only the master thread executes the block; others skip it immediately.
+
+#include <stdio.h>
+#include <omp.h>
+
+int main() {
+    #pragma omp parallel num_threads(4)
+    {
+        int id = omp_get_thread_num();
+        #pragma omp master
+        {
+            printf("Master thread %d is initializing data.\n", id);
+        }
+        printf("Thread %d is performing computation.\n", id);
+    }
+    return 0;
+}
+
+Task 1: Private vs Shared Variable Demonstration  Compares local copies (private) vs global updates (shared).
+
+#include <stdio.h>
+#include <omp.h>
+
+int main() {
+    int x = 10;
+
+    printf("--- Part 1: Private ---\n");
+    // 1. Private: Each thread gets a copy. Original 'x' is untouched.
+    #pragma omp parallel private(x)
+    {
+        x = omp_get_thread_num(); // Modify local copy
+        printf("Thread %d has private x = %d\n", omp_get_thread_num(), x);
+    }
+    printf("Value of x after private region: %d (Should be 10)\n\n", x);
+
+    printf("--- Part 2: Shared ---\n");
+    // 2. Shared: All threads modify the same 'x'.
+    #pragma omp parallel shared(x)
+    {
+        // Using atomic to safely increment shared variable
+        #pragma omp atomic
+        x++; 
+        printf("Thread %d incremented shared x.\n", omp_get_thread_num());
+    }
+    printf("Value of x after shared region: %d\n", x);
+
+    return 0;
+}
+
+Task 2: Barrier Demonstration  Ensures "Before" prints happen before any "After" prints.
+
+#include <stdio.h>
+#include <omp.h>
+
+int main() {
+    omp_set_num_threads(4);
+
+    #pragma omp parallel
+    {
+        int id = omp_get_thread_num();
+        
+        printf("Thread %d reached before barrier\n", id);
+        
+        // Wait for all threads to finish the print above
+        #pragma omp barrier
+        
+        printf("Thread %d passed barrier\n", id);
+    }
+    return 0;
+}
+
+Task 3: Atomic Counter  Runs a loop to increment a counter with and without atomic protection.
+
+#include <stdio.h>
+#include <omp.h>
+
+int main() {
+    int counter;
+    int iterations = 100;
+    omp_set_num_threads(16); // Task requirement
+
+    // Case A: Without Atomic (Wrong)
+    counter = 0;
+    #pragma omp parallel for
+    for(int i=0; i<iterations * 16; i++) {
+        counter++; // Race condition
+    }
+    printf("Without Atomic: %d (Expected %d)\n", counter, iterations * 16);
+
+    // Case B: With Atomic (Correct)
+    counter = 0;
+    #pragma omp parallel for
+    for(int i=0; i<iterations * 16; i++) {
+        #pragma omp atomic
+        counter++;
+    }
+    printf("With Atomic:    %d (Expected %d)\n", counter, iterations * 16);
+
+    return 0;
+}
+
+Task 4: Master Thread Logging  Master thread prints start/end logs, while all threads do work.
+
+#include <stdio.h>
+#include <omp.h>
+
+int main() {
+    omp_set_num_threads(8);
+
+    #pragma omp parallel
+    {
+        // Start message by master
+        #pragma omp master
+        {
+            printf("START: Master thread starting the work...\n");
+        }
+        
+        // All threads do work (no barrier after master, so they might run immediately)
+        printf("Thread %d is working...\n", omp_get_thread_num());
+        
+        // Ensure all work is done before printing the end message
+        #pragma omp barrier 
+        
+        // End message by master
+        #pragma omp master
+        {
+            printf("END: All work done.\n");
+        }
+    }
+    return 0;
+}
+
+Task 5 (Final): Parallel Array Summation  Combines shared, private, and atomic.
+
+#include <stdio.h>
+#include <omp.h>
+
+int main() {
+    int arr[100];
+    for(int i=0; i<100; i++) arr[i] = i + 1; // Values 1 to 100
+
+    // Method A: Shared variable with atomic
+    int sum_A = 0;
+    #pragma omp parallel for shared(sum_A)
+    for(int i=0; i<100; i++) {
+        #pragma omp atomic
+        sum_A += arr[i];
+    }
+    printf("Method A (Shared + Atomic) Sum: %d\n", sum_A);
+
+    // Method B: Private partial sums
+    int sum_B = 0;
+    #pragma omp parallel 
+    {
+        int local_sum = 0; // Private variable for partial sum
+        
+        // Distribute loop iterations manually or using omp for
+        #pragma omp for
+        for(int i=0; i<100; i++) {
+            local_sum += arr[i];
+        }
+
+        printf("Thread %d partial sum: %d\n", omp_get_thread_num(), local_sum);
+
+        // Add partial sum to global sum safely
+        #pragma omp atomic
+        sum_B += local_sum;
+    }
+    printf("Method B (Private Partial + Atomic) Sum: %d\n", sum_B);
+
+    return 0;
+}
+
+Lab 06: OpenMP - Ordered Execution
+
+1. Behavior Without vs. With Ordered  Shows how output order is random by default but enforced sequentially with ordered.
+
+#include <stdio.h>
+#include <omp.h>
+
+int main() {
+    omp_set_num_threads(4); // fixed number of threads
+    
+    printf("Without ordered:\n");
+    #pragma omp parallel for
+    for (int i = 0; i < 10; i++) {
+        printf("Iteration %d executed by thread %d\n", i, omp_get_thread_num());
+    }
+
+    printf("\nWith ordered:\n");
+    #pragma omp parallel for ordered
+    for (int i = 0; i < 10; i++) {
+        // do some computation
+        #pragma omp ordered
+        {
+            printf("Iteration %d executed by thread %d\n", i, omp_get_thread_num());
+        }
+    }
+    return 0;
+}
+
+// mergesort with ordered output
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <omp.h>
+
+// --- Helper Function: Merge two subarrays ---
+void merge(int arr[], int left, int mid, int right) {
+    int i, j, k;
+    int n1 = mid - left + 1;
+    int n2 = right - mid;
+
+    // Create temporary arrays
+    int *L = (int*)malloc(n1 * sizeof(int));
+    int *R = (int*)malloc(n2 * sizeof(int));
+
+    // Copy data to temp arrays
+    for (i = 0; i < n1; i++)
+        L[i] = arr[left + i];
+    for (j = 0; j < n2; j++)
+        R[j] = arr[mid + 1 + j];
+
+    // Merge the temp arrays back into arr[left..right]
+    i = 0; 
+    j = 0; 
+    k = left;
+    while (i < n1 && j < n2) {
+        if (L[i] <= R[j]) {
+            arr[k] = L[i];
+            i++;
+        } else {
+            arr[k] = R[j];
+            j++;
+        }
+        k++;
+    }
+
+    // Copy remaining elements of L[], if any
+    while (i < n1) {
+        arr[k] = L[i];
+        i++;
+        k++;
+    }
+
+    // Copy remaining elements of R[], if any
+    while (j < n2) {
+        arr[k] = R[j];
+        j++;
+        k++;
+    }
+
+    free(L);
+    free(R);
+}
+
+// --- Helper Function: Recursive Merge Sort ---
+// Note: This is a serial merge sort called by each thread individually
+void mergeSort(int arr[], int left, int right) {
+    if (left < right) {
+        int mid = left + (right - left) / 2;
+
+        // Sort first and second halves
+        mergeSort(arr, left, mid);
+        mergeSort(arr, mid + 1, right);
+
+        merge(arr, left, mid, right);
+    }
+}
+
+int main() {
+    int arr[16];
+    // Generate random array
+    for(int i=0; i<16; i++) arr[i] = rand() % 100;
+
+    int num_parts = 4;
+    int part_size = 16 / num_parts;
+
+    printf("Original Array: ");
+    for(int i=0; i<16; i++) printf("%d ", arr[i]);
+    printf("\n\n");
+
+    double start = omp_get_wtime();
+
+    // Parallel region with ordered clause
+    // Each thread takes one iteration of the loop (one segment of the array)
+    #pragma omp parallel for ordered num_threads(4)
+    for(int i=0; i<num_parts; i++) {
+        // Calculate global start and end indices for this thread's part
+        int start_idx = i * part_size;
+        int end_idx = start_idx + part_size - 1;
+        
+        // Sort this part locally using Merge Sort [cite: 962]
+        // This replaces the qsort from the previous version
+        mergeSort(arr, start_idx, end_idx);
+
+        // Print segments in sequential order (Segment 0 -> 1 -> 2 -> 3) [cite: 1002]
+        #pragma omp ordered
+        {
+            printf("Segment %d (Thread %d): ", i, omp_get_thread_num());
+            for(int j=0; j<part_size; j++) {
+                printf("%d ", arr[start_idx + j]);
+            }
+            printf("\n");
+        }
+    }
+
+    double end = omp_get_wtime();
+    printf("\nExecution Time: %f s\n", end - start);
+
+    return 0;
+}
+
+Task 2: Matrix Multiplication with and without Ordered  Demonstrates how ordered forces row-by-row printing but adds overhead.
+
+#include <stdio.h>
+#include <omp.h>
+
+#define N 4
+
+int main() {
+    int A[N][N], B[N][N], C[N][N];
+    
+    // Initialize matrices
+    for(int i=0; i<N; i++) {
+        for(int j=0; j<N; j++) {
+            A[i][j] = i + j;
+            B[i][j] = i * j;
+            C[i][j] = 0;
+        }
+    }
+
+    // Version 1: Without Ordered
+    printf("--- Without Ordered (Random Output) ---\n");
+    double start1 = omp_get_wtime();
+    
+    #pragma omp parallel for
+    for(int i=0; i<N; i++) {
+        for(int j=0; j<N; j++) {
+            // Compute
+            int sum = 0;
+            for(int k=0; k<N; k++) sum += A[i][k] * B[k][j];
+            C[i][j] = sum;
+            
+            // Print immediately (messy)
+            printf("C[%d][%d]=%d (Th %d)\n", i, j, C[i][j], omp_get_thread_num());
+        }
+    }
+    printf("Time without ordered: %f s\n\n", omp_get_wtime() - start1);
+
+    // Version 2: With Ordered
+    printf("--- With Ordered (Sequential Output) ---\n");
+    double start2 = omp_get_wtime();
+    
+    // Note: ordered clause goes on the loop
+    #pragma omp parallel for ordered
+    for(int i=0; i<N; i++) {
+        for(int j=0; j<N; j++) {
+            // Compute
+            int sum = 0;
+            for(int k=0; k<N; k++) sum += A[i][k] * B[k][j];
+            C[i][j] = sum;
+
+            // Print in strict order
+            #pragma omp ordered
+            {
+                printf("C[%d][%d]=%d (Th %d)\n", i, j, C[i][j], omp_get_thread_num());
+            }
+        }
+    }
+    printf("Time with ordered: %f s\n", omp_get_wtime() - start2);
+
+    return 0;
+}
+
+Task 3: Parallel Computation with Timing and Ordered Output  Computes squares and prints them in numeric order.
+
+#include <stdio.h>
+#include <omp.h>
+
+int main() {
+    int limit = 20;
+
+    printf("--- Calculating Squares (Ordered) ---\n");
+    double start = omp_get_wtime();
+
+    #pragma omp parallel for ordered
+    for(int i=1; i<=limit; i++) {
+        // Computation (Parallel)
+        int square = i * i;
+        int id = omp_get_thread_num();
+
+        // Logging (Sequential)
+        #pragma omp ordered
+        {
+            printf("Thread %d computed square of %d = %d\n", id, i, square);
+        }
+    }
+
+    double end = omp_get_wtime();
+    printf("Execution Time: %f s\n", end - start);
+    
+    return 0;
+}

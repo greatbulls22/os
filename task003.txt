@@ -1,0 +1,400 @@
+1. Basic Add Example 1
+Code snippet
+
+li a0, 5        # Load immediate value 5 into register a0
+li a1, 7        # Load immediate value 7 into register a1
+add a2, a0, a1  # Add the values in a0 and a1, store the result in a2
+
+Part 2: Task SolutionsTask 1: Calculate the sum of three integers 
+Code snippet
+.text
+main:
+    li t0, 10       # Load 1st integer
+    li t1, 20       # Load 2nd integer
+    li t2, 30       # Load 3rd integer
+    
+    add t3, t0, t1  # Sum first two numbers
+    add t3, t3, t2  # Add third number to the result
+    
+    # Result is now in t3
+
+Task 2: Translate High-Level Code 
+High Level: a = b - c; and f = (g + h) - (i + j);Assumptions: a-c in s0-s2, f-j in s3-s7.
+Code snippet
+
+.text
+main:
+    # 1) a = b - c
+    sub s0, s1, s2      # s0 = s1 - s2
+
+    # 2) f = (g + h) - (i + j)
+    add t0, s4, s5      # t0 = g + h
+    add t1, s6, s7      # t1 = i + j
+    sub s3, t0, t1      # f = t0 - t1
+
+Task 3: Multiply 3 with -17 
+Code snippet
+
+.text
+main:
+    li t0, 3        # Load 3
+    li t1, -17      # Load -17
+    mul t3, t0, t1  # t3 = 3 * -17
+
+Task 4: Divide -50 by 3 (Quotient and Remainder) 
+Code snippet
+
+.text
+main:
+    li t0, -50      # Load -50
+    li t1, 3        # Load 3
+    
+    div t2, t0, t1  # t2 = Quotient (-50 / 3)
+    rem t3, t0, t1  # t3 = Remainder (-50 % 3)
+
+
+Lab 08: Data Transfer and ArithmeticPart 
+1. Loading and Storing 
+
+Code snippet
+li x1, 42       # Load immediate value 42 into register x1
+sw x1, 0(x2)    # Store value in x1 into memory at address stored in x2
+
+2. Load Word / Store Word 
+Code snippet
+lw x3, 100(x4)  # Load value from memory into register x3
+sw x5, 200(x6)  # Store value from register x5 into memory
+
+3. Arithmetic (Add/Sub) 
+Code snippet
+add x7, x8, x9    # Add values in x8 and x9, store result in x7
+sub x10, x11, x12 # Subtract value in x12 from x11, store result in x10
+
+4. Multiplication 
+Code snippet
+
+.data
+operand1: .word 5        # Define operand1 as 5
+operand2: .word 8        # Define operand2 as 8
+result:   .word 0        # Define a space to store the result
+
+.text
+lw t0, operand1          # Load operand1 into register t0
+lw t1, operand2          # Load operand2 into register t1
+mul t2, t0, t1           # Multiply operand1 and operand2, store result in t2
+sw t2, result            # Store the result in memory
+
+5. Division 
+Code snippet
+
+.data
+dividend: .word 20       # Define dividend as 20
+divisor:  .word 5        # Define divisor as 5
+quotient: .word 0        # Define a space to store the quotient
+
+.text
+lw a0, dividend          # Load dividend into register a0
+lw a1, divisor           # Load divisor into register a1
+div a0, a1               # Divide dividend by divisor, quotient stored in a0
+mflo t3                  # Move the quotient from lo register to t3
+sw t3, quotient          # Store the quotient in memory
+(Note: mflo is not standard RISC-V. In Venus, use div t3, a0, a1 instead.)
+
+6. Logical Instructions 
+Code snippet
+
+and rd, rs1, rs2     # rd = rs1 & rs2
+andi rd, rs1, imm    # rd = rs1 & imm
+or rd, rs1, rs2      # rd = rs1 | rs2
+ori rd, rs1, imm     # rd = rs1 | imm
+xor rd, rs1, rs2     # rd = rs1 ^ rs2
+xori rd, rs1, imm    # rd = rs1 ^ imm
+not rd, rs1          # rd = ~rs1 (pseudoinstruction)
+
+Part 2: Task Solutions
+Task 1: Store a full 32-bit constant (Registration Number) Assumption: Registration Number is 0x12345678.
+Code snippet
+
+.text
+main:
+    # Load upper 20 bits (0x12345)
+    lui t0, 0x12345
+    
+    # Add lower 12 bits (0x678)
+    addi t0, t0, 0x678
+    
+    # t0 now holds 0x12345678
+
+Task 2: Arithmetic Instructions 
+Code snippet
+
+.text
+main:
+    li t0, 20       # Load 20
+    li t1, 10       # Load 10
+    li t2, 5        # Load 5
+    
+    add t3, t0, t1  # Addition: 20 + 10 = 30
+    sub t3, t3, t2  # Subtraction: 30 - 5 = 25
+    mul t3, t3, t2  # Multiplication: 25 * 5 = 125
+    div t3, t3, t1  # Division: 125 / 10 = 12
+
+Task 3: Load from Memory, Compute, Store 
+Code snippet
+
+.data
+num1:   .word 50
+num2:   .word 25
+result: .word 0
+
+.text
+main:
+    lw t0, num1      # Load num1
+    lw t1, num2      # Load num2
+    
+    sub t2, t0, t1   # Compute: 50 - 25 = 25
+    
+    sw t2, result    # Store result back to memory
+
+Task 4: Bitwise Logical Operations 
+Code snippet
+
+.text
+main:
+    li t0, 0xF0      # 11110000
+    li t1, 0x0F      # 00001111
+    
+    and t2, t0, t1   # AND: Result 0x00
+    or  t3, t0, t1   # OR:  Result 0xFF
+    xor t4, t0, t1   # XOR: Result 0xFF
+    not t5, t0       # NOT: Result 0xFFFFFF0F (Inverts t0)
+    
+Lab 09: Shift Instructions, Branching, and Control Structures
+1. Shift Instructions 
+Code snippet
+
+li x1, 0x0F      # Load x1 with 0x0F (binary: 00001111)
+slli x2, x1, 2   # x2 = x1 << 2 (binary: 00111100)
+srli x3, x1, 2   # x3 = x1 >> 2 (binary: 00000011)
+
+2. Conditional Branching (beq) 
+Code snippet
+
+li x1, 5
+li x2, 5
+beq x1, x2, equal
+j not_equal
+
+equal:
+    # Code to execute if x1 == x2
+    j end
+
+not_equal:
+    # Code to execute if x1 != x2
+    
+end:
+    # End of program
+
+3. Unconditional Jump (j) 
+Code snippet
+
+j skip
+addi x5, x0, 10    # This instruction will be skipped
+
+skip:
+addi x6, x0, 20    # Execution continues here
+
+4. IF Statement 
+Code snippet
+
+li x1, 10
+li x2, 5
+bge x1, x2, if_true
+j end
+
+if_true:
+    # Code to execute if x1 >= x2
+    
+end:
+    # End of program
+
+5. IF-ELSE Statement 
+Code snippet
+
+li x1, 10
+li x2, 5
+bge x1, x2, if_true
+j else
+
+if_true:
+    # Code to execute if x1 >= x2
+    j end
+
+else:
+    # Code to execute if x1 < x2
+
+end:
+    # End of program
+
+6. While Loop 
+Code snippet
+
+loop:
+    beq x5, x0, end_loop
+    addi x5, x5, -1
+    j loop
+end_loop:
+
+7. For Loop 
+Code snippet
+
+addi x5, x0, 0     # i = 0
+addi x6, x0, 5     # Loop limit
+
+for_loop:
+    beq x5, x6, end_for
+    addi x5, x5, 1 # i++
+    j for_loop
+end_for:
+
+Part 2: Task Solutions
+Task 1: Shift Operations 
+Code snippet
+
+.text
+main:
+    li t0, 4        # Load 4 (binary 100)
+    
+    slli t2, t0, 1  # Logic Left Shift (4 << 1 = 8)
+    srli t3, t0, 1  # Logic Right Shift (4 >> 1 = 2)
+    srai t4, t0, 1  # Arithmetic Right Shift (Preserves sign)
+
+Task 2: Conditional Branching (beq) 
+Code snippet
+
+.text
+main:
+    li s0, 8        # Load value 1
+    li s1, 2        # Load value 2
+    
+    slli s1, s1, 2  # Shift left s1 by 2 (2 << 2 = 8)
+    
+    beq s0, s1, target  # If s0 == s1, goto target
+    
+    # Instructions to skip
+    nop
+    nop
+    
+    j end           # Jump to end to avoid falling into target
+    
+target:
+    add s1, s1, s0  # s1 = s1 + s0
+
+end:
+
+Task 3: Conditional Branching (bne) 25
+Code snippet
+
+.text
+main:
+    li s0, 8
+    li s1, 2
+    slli s1, s1, 2  # s1 becomes 8
+    
+    bne s0, s1, target # Branch if s0 != s1
+    
+    # Fall through here because s0 == s1
+    j end
+
+target:
+    # This will NOT be executed
+    add s1, s1, s0
+
+end:
+
+Task 4: Unconditional Branching (j) 
+Code snippet
+
+.text
+main:
+    li s0, 10
+    li s1, 20
+    
+    j target        # Unconditional jump
+    
+    # Skipped instructions
+    addi s0, s0, 1
+    sub s1, s1, s0
+    
+target:
+    add s1, s1, s0  # s1 = s1 + s0
+
+Task 4:  C Code to Assembly (IF and IF-ELSE)
+Part A: IF Statement if (apples == oranges) f = g + h; apples = oranges - h;Mapping: apples(s0), oranges(s1), f(s2), g(s3), h(s4)
+Code snippet
+
+.text
+    # Assume registers are initialized
+    bne s0, s1, L1      # If apples != oranges, skip
+    
+    # If equal block:
+    add s2, s3, s4      # f = g + h
+    
+L1:
+    sub s0, s1, s4      # apples = oranges - h
+
+Part B: IF-ELSE Statement if (apples == oranges) f=g+h; else apples=oranges-h;
+Code snippet
+
+.text
+    bne s0, s1, L1      # If apples != oranges, go to ELSE (L1)
+    
+    # IF block:
+    add s2, s3, s4      # f = g + h
+    j L2                # Skip ELSE block
+    
+L1: # ELSE block
+    sub s0, s1, s4      # apples = oranges - h
+    
+L2: # End
+
+Task 5: While Loop ($2^x = 128$) Mapping: pow(s0), x(s1), const 128(t0)
+Code snippet
+
+.text
+main:
+    li s0, 1        # pow = 1
+    li s1, 0        # x = 0
+    li t0, 128      # Stop condition
+    
+loop:
+    beq s0, t0, done    # If pow == 128, exit
+    
+    slli s0, s0, 1      # pow = pow * 2 (Shift left by 1)
+    addi s1, s1, 1      # x = x + 1
+    
+    j loop              # Repeat
+
+done:
+    # Loop finished
+
+Task 6: For Loop (Sum 0 to 9) 
+Mapping: sum(s1), i(s0), limit 10(t0)
+Code snippet
+
+.text
+main:
+    li s1, 0        # sum = 0
+    li s0, 0        # i = 0
+    li t0, 10       # Loop limit
+    
+for_loop:
+    bge s0, t0, done    # If i >= 10, exit
+    
+    add s1, s1, s0      # sum = sum + i
+    addi s0, s0, 1      # i++
+    
+    j for_loop          # Repeat
+
+done:
+    # Loop finished
