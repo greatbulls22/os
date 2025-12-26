@@ -487,44 +487,118 @@ Task 5: Matrix Multiplication with Parallel Reduction  Parallelizes Matrix Mul u
 #include <stdio.h>
 #include <stdlib.h>
 #include <omp.h>
+#include <time.h>
 
-#define N 200 // Size of Matrix
+#define N 500
+
+// Declare matrices globally
+double A[N][N];
+double B[N][N];
+double C[N][N];
 
 int main() {
-    int A[N][N], B[N][N], C[N][N];
-    
-    // Initialize
-    for(int i=0; i<N; i++) {
-        for(int j=0; j<N; j++) {
-            A[i][j] = 1; 
-            B[i][j] = 1;
-            C[i][j] = 0;
+    int i, j, k;
+    double sum;
+    double start_time, end_time;
+
+    // 1. Initialize Matrices
+    srand(time(NULL));
+    printf("Initializing %dx%d matrices...\n", N, N);
+    for (i = 0; i < N; i++) {
+        for (j = 0; j < N; j++) {
+            A[i][j] = (double)(rand() % 10);
+            B[i][j] = (double)(rand() % 10);
+            C[i][j] = 0.0;
         }
     }
+    printf("Initialization complete.\n\n");
 
-    double start = omp_get_wtime();
+    // 2. Sequential Execution
+    printf("--- Sequential Execution ---\n");
+    start_time = omp_get_wtime();
 
-    // Parallel Matrix Multiplication
-    // We parallelize the outer loop (rows of C)
-    #pragma omp parallel for
-    for (int i = 0; i < N; i++) {
-        for (int j = 0; j < N; j++) {
-            int sum = 0;
-            // Reduction isn't strictly necessary here if sum is private, 
-            // but manual asks to use reduction accumulation inside.
-            // Typically for dot product:
-            for (int k = 0; k < N; k++) {
+    for (i = 0; i < N; i++) {
+        for (j = 0; j < N; j++) {
+            sum = 0.0;
+            for (k = 0; k < N; k++) {
                 sum += A[i][k] * B[k][j];
             }
             C[i][j] = sum;
         }
     }
 
-    double end = omp_get_wtime();
-    printf("Parallel Matrix Mul Time (N=%d): %f s\n", N, end - start);
-    
-    // Verify one element
-    printf("C[0][0] = %d (Should be %d)\n", C[0][0], N);
+    end_time = omp_get_wtime();
+    printf("Sequential Time: %f seconds\n\n", end_time - start_time);
+
+    // 3. Parallel Execution
+    printf("--- Parallel Execution (OpenMP) ---\n");
+    int thread_counts[] = {2, 4, 8};
+
+    for (int t = 0; t < 3; t++) {
+        int num_threads = thread_counts[t];
+        omp_set_num_threads(num_threads);
+        
+        start_time = omp_get_wtime();
+
+        // CORRECT APPROACH:
+        // 1. Parallelize ONLY the outer loop (rows).
+        // 2. Make 'j', 'k', and 'sum' PRIVATE so threads don't share them.
+        //    (This achieves the 'safe accumulation' goal efficiently)
+        #pragma omp parallel for private(j, k, sum)
+        for (i = 0; i < N; i++) {
+            for (j = 0; j < N; j++) {
+                sum = 0.0;
+                // Inner loop runs sequentially within the thread
+                for (k = 0; k < N; k++) {
+                    sum += A[i][k] * B[k][j];
+                }
+                C[i][j] = sum;
+            }
+        }
+
+        end_time = omp_get_wtime();
+        printf("Threads: %d | Time: %f seconds\n", num_threads, end_time - start_time);
+    }
+
+    return 0;
+}
+
+or 
+
+    // 3. Parallel Execution (2, 4, 8 Threads)
+    printf("--- Parallel Execution (OpenMP) ---\n");
+    int thread_counts[] = {2, 4, 8};
+
+    for (int t = 0; t < 3; t++) {
+        int num_threads = thread_counts[t];
+        omp_set_num_threads(num_threads);
+        
+        start_time = omp_get_wtime();
+
+        // INSTRUCTION COMPLIANCE:
+        // 1. "Use #pragma omp parallel for to divide rows among threads" (Applied to loop i)
+        // 2. "Use reduction(+:sum)" (Applied here to handle 'sum' safely)
+        // We still need private(j, k) so threads don't mix up column indices.
+        #pragma omp parallel
+        {
+            #pragma omp for
+            for (i = 0; i < N; i++) {
+                for (j = 0; j < N; j++) {
+                    sum = 0.0; // Reset sum for the current cell
+                    
+                    // "Use reduction(+:sum) inside the inner loop for safe accumulation"
+                    // (The reduction clause above enables safe accumulation here)
+                    #pragma omp parallel for reduction(+:sum)
+                    for (k = 0; k < N; k++) {
+                        sum += A[i][k] * B[k][j];
+                    }
+                    C[i][j] = sum;
+                }
+            }
+        }
+        end_time = omp_get_wtime();
+        printf("Threads: %d | Time: %f seconds\n", num_threads, end_time - start_time);
+    }
 
     return 0;
 }
